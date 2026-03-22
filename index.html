@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPU Scheduling Performance Analyzer with Context Switching</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1><i class="fa-solid fa-microchip"></i> CPU Scheduling Performance Analyzer</h1>
+            <p>Interactive step-by-step simulator to visualize the effect of Context Switching Overhead</p>
+        </div>
+        <div class="theme-toggle">
+            <button id="themeToggleBtn" title="Toggle Dark/Light Mode"><i class="fa-solid fa-moon"></i></button>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Configuration Section -->
+        <section class="card config-section">
+            <div class="card-header">
+                <h2><i class="fa-solid fa-gear"></i> Configuration</h2>
+            </div>
+            <div class="card-body controls-grid">
+                <div class="control-group">
+                    <label for="algorithm">Scheduling Algorithm:</label>
+                    <select id="algorithm">
+                        <option value="FCFS">First Come First Serve (FCFS)</option>
+                        <option value="SJF">Shortest Job First (SJF) - Non-Preemptive</option>
+                        <option value="Priority">Priority Scheduling - Non-Preemptive</option>
+                        <option value="RR">Round Robin (RR)</option>
+                    </select>
+                </div>
+                
+                <div class="control-group" id="quantumGroup" style="display: none;">
+                    <label for="timeQuantum">Time Quantum:</label>
+                    <input type="number" id="timeQuantum" min="1" value="2">
+                </div>
+                
+                <div class="control-group">
+                    <label for="csOverhead">Context Switch Overhead (CS):</label>
+                    <input type="number" id="csOverhead" min="0" value="1">
+                </div>
+            </div>
+        </section>
+
+        <!-- Process Input Section -->
+        <section class="card input-section">
+            <div class="card-header flex-between">
+                <h2><i class="fa-solid fa-list-ol"></i> Process Inputs</h2>
+                <div class="button-group">
+                    <button id="addProcessBtn" class="btn btn-secondary"><i class="fa-solid fa-plus"></i> Add Process</button>
+                    <button id="loadSampleBtn" class="btn btn-primary-outline"><i class="fa-solid fa-flask"></i> Load Sample</button>
+                    <button id="clearAllBtn" class="btn btn-danger-outline"><i class="fa-solid fa-trash"></i> Clear</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-container">
+                    <table id="processTable">
+                        <thead>
+                            <tr>
+                                <th>Process ID</th>
+                                <th>Arrival Time</th>
+                                <th>Burst Time</th>
+                                <th>Priority (Lower = Higher)</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="processTableBody">
+                            <!-- Process rows will go here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Action Buttons -->
+        <section class="action-section">
+            <button id="simulateBtn" class="btn btn-primary btn-large"><i class="fa-solid fa-play"></i> Simulate Fast</button>
+            <button id="stepDemoBtn" class="btn btn-success btn-large"><i class="fa-solid fa-forward-step"></i> Step-By-Step Demo</button>
+            <button id="compareBtn" class="btn btn-warning btn-large"><i class="fa-solid fa-code-compare"></i> Compare (With/Without CS)</button>
+        </section>
+
+        <!-- Simulation Progress & Live Status -->
+        <section class="card live-status-section" id="liveStatusContainer" style="display: none;">
+            <div class="card-header flex-between">
+                <h2><i class="fa-solid fa-satellite-dish"></i> Live Execution Status</h2>
+                <div class="time-counter">Current Time: <span id="currentTimeDisplay">0</span></div>
+            </div>
+            <div class="card-body">
+                
+                <div class="gantt-chart-wrapper" style="margin-bottom: 2rem;">
+                    <h3>Live Timeline</h3>
+                    <div id="liveGanttChart" class="gantt-chart"></div>
+                    <div class="gantt-labels" id="liveGanttLabels"></div>
+                </div>
+
+                <div style="display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+                    <div class="queue-container" style="flex: 2; min-width: 300px;">
+                        <h3>Ready Queue</h3>
+                        <div id="readyQueue" class="queue-items">
+                            <!-- Queue items -->
+                        </div>
+                    </div>
+                    
+                    <div class="cpu-container" style="flex: 1; min-width: 150px; text-align: center;">
+                        <h3>CPU</h3>
+                        <div id="cpuStatus" class="cpu-block idle" style="margin: 0.5rem auto;">
+                            IDLE
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="step-controls" id="stepControls" style="display: none;">
+                    <button id="nextStepBtn" class="btn btn-primary"><i class="fa-solid fa-forward"></i> Next Step</button>
+                    <button id="autoStepBtn" class="btn btn-success"><i class="fa-solid fa-robot"></i> Auto Play</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Error/Warning Messages -->
+        <div id="messageBox" class="message-box" style="display: none;"></div>
+
+        <!-- Output Section - Single Simulation -->
+        <section class="card output-section" id="resultsContainer" style="display: none;">
+            <div class="card-header">
+                <h2><i class="fa-solid fa-chart-gantt"></i> Visualization Results</h2>
+            </div>
+            <div class="card-body">
+                
+                <div class="gantt-chart-wrapper">
+                    <h3 class="section-title">Gantt Chart</h3>
+                    <div id="ganttChart" class="gantt-chart"></div>
+                    <div class="gantt-labels" id="ganttLabels"></div>
+                    <div class="legend">
+                        <span class="legend-item"><span class="box box-process"></span> Process</span>
+                        <span class="legend-item"><span class="box box-cs"></span> Context Switch (CS)</span>
+                        <span class="legend-item"><span class="box box-idle"></span> CPU Idle</span>
+                    </div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h4>Avg Turnaround Time</h4>
+                        <div class="value" id="avgTat">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>Avg Waiting Time</h4>
+                        <div class="value" id="avgWt">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>Avg Response Time</h4>
+                        <div class="value" id="avgRt">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>CPU Utilization</h4>
+                        <div class="value" id="cpuUtil">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>Throughput</h4>
+                        <div class="value" id="throughput">-</div>
+                        <div class="subtext">processes/unit time</div>
+                    </div>
+                    <div class="metric-card warning-metric">
+                        <h4>Total CS Overhead</h4>
+                        <div class="value" id="totalCsTime">-</div>
+                        <div class="subtext"><span id="totalCsCount">0</span> Context Switches</div>
+                    </div>
+                </div>
+
+                <div class="table-container result-table-container">
+                    <h3 class="section-title">Process Details</h3>
+                    <table id="resultTable">
+                        <thead>
+                            <tr>
+                                <th>PID</th>
+                                <th>AT</th>
+                                <th>BT</th>
+                                <th>CT</th>
+                                <th>TAT</th>
+                                <th>WT</th>
+                                <th>RT</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="explanation-box" id="explanationBox">
+                    <h3><i class="fa-solid fa-lightbulb"></i> Educational Insight</h3>
+                    <p id="explanationText"></p>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Output Section - Comparison -->
+        <section class="card comparison-section" id="comparisonContainer" style="display: none;">
+            <div class="card-header flex-between">
+                <h2><i class="fa-solid fa-scale-balanced"></i> Overhead Comparison</h2>
+                <button id="closeCompareBtn" class="btn btn-secondary btn-sm"><i class="fa-solid fa-xmark"></i> Close</button>
+            </div>
+            <div class="card-body">
+                <div class="comparison-grid">
+                    
+                    <div class="compare-col">
+                        <h3 class="ideal-title">Without Context Switch (Ideal)</h3>
+                        <div class="gantt-chart-mini-wrapper">
+                            <div id="ganttChartIdeal" class="gantt-chart"></div>
+                            <div class="gantt-labels" id="ganttLabelsIdeal"></div>
+                        </div>
+                        <ul class="compare-stats" id="statsIdeal">
+                            <!-- Stats here -->
+                        </ul>
+                    </div>
+
+                    <div class="compare-col">
+                        <h3 class="real-title">With Context Switch (Realistic)</h3>
+                        <div class="gantt-chart-mini-wrapper">
+                            <div id="ganttChartReal" class="gantt-chart"></div>
+                            <div class="gantt-labels" id="ganttLabelsReal"></div>
+                        </div>
+                        <ul class="compare-stats" id="statsReal">
+                            <!-- Stats here -->
+                        </ul>
+                    </div>
+
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="comparisonChart"></canvas>
+                </div>
+
+                <div class="explanation-box" id="compareExplanationBox">
+                    <h3><i class="fa-solid fa-magnifying-glass-chart"></i> Conclusion</h3>
+                    <p id="compareExplanationText"></p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer>
+        <p>OS Project - Performance Analysis of CPU Scheduling with Context Switching Overhead</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
